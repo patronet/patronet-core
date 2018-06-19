@@ -316,11 +316,11 @@ class Table implements \IteratorAggregate, \Countable
     }
     
     /**
-     * Gets a single field data from the table
+     * Gets a single field data from the table by ID
      *
      * @param string|int $id
      * @param string $field
-     * @return array|null
+     * @return mixed|null
      */
     public function getField($id, $field)
     {

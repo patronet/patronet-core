@@ -347,6 +347,19 @@ class Table implements \IteratorAggregate, \Countable
     }
     
     /**
+     * Gets a single field data from the table specified by a filter and order
+     *
+     * @param string $field
+     * @param mixed $filter
+     * @param string[string]|string|null $order
+     * @return mixed|null
+     */
+    public function getFieldFirst($field, $filter = null, $order = null)
+    {
+        return $this->getFirst($filter, $order, is_int($field) ? null : [$field], ResultSet::FETCH_FIELD, $field);
+    }
+    
+    /**
      * Checks whether a record exists in the table
      *
      * @param string|int $id

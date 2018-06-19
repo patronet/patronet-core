@@ -213,7 +213,8 @@ class Connection implements ConnectionInterface
         if ($this->isInTransaction()) {
             $this->oPdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
         }
-        $wasPreparesEmulated = $this->oPdo->getAttribute(\PDO::ATTR_EMULATE_PREPARES);
+        // XXX no way to eliminate the potential php-warning
+        $wasPreparesEmulated = @$this->oPdo->getAttribute(\PDO::ATTR_EMULATE_PREPARES);
         if ($wasPreparesEmulated) {
             $this->oPdo->setAttribute(\Pdo::ATTR_EMULATE_PREPARES, false);
         }

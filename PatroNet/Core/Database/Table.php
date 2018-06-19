@@ -492,6 +492,9 @@ class Table implements \IteratorAggregate, \Countable
         if (!is_null($limit)) {
             $oQueryBuilder->limit($limit);
         }
+        
+        $this->joinTables($oQueryBuilder, $this->detectTableNames($filter, null, null));
+        
         return $oQueryBuilder->execute();
     }
     
@@ -673,4 +676,3 @@ class Table implements \IteratorAggregate, \Countable
     }
     
 }
-

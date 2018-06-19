@@ -6,6 +6,7 @@ use PatroNet\Core\Database\Connection;
 use PatroNet\Core\Database\AbstractQueryBuilder;
 use PatroNet\Core\Database\QueryBuilder as QueryBuilderInterface;
 use PatroNet\Core\Database\Filter;
+use PatroNet\Core\Database\ResultSet;
 
 
 /**
@@ -97,11 +98,34 @@ class QueryBuilder extends AbstractQueryBuilder
                 }
                 break;
             case QueryBuilderInterface::QUERYTYPE_DELETE:
+                if (isset($this->parts["limit"]) && isset($this->parts["joins"])) {
+                    $alias = isset($this->parts["baseTableAlias"]) ? $this->parts["baseTableAlias"] : $this->parts["baseTable"];
+                    $outerAlias = "tmp_outer_" . uniqid();
+                    $subQueryAlias = "tmp_subquery_" . uniqid();
+                    
+                    $oSelectBuilder = new self($this->oConnection);
+                    $selectParts = $this->parts;
+                    $selectParts["type"] = QueryBuilderInterface::QUERYTYPE_SELECT;
+                    $selectParts["selectFields"] = $this->quoteIdentifier($alias) . ".*";
+                    $oSelectBuilder->parts = $selectParts;
+                    $subSelectQuery = $oSelectBuilder->generateQuery();
+                    
+                    $result .=
+                        "DELETE " . $this->quoteIdentifier($outerAlias) .
+                        " FROM " . $this->quoteIdentifier($this->parts["baseTable"]) . " AS " . $this->quoteIdentifier($outerAlias) .
+                        " NATURAL JOIN ( {$subSelectQuery} ) AS " . $this->quoteIdentifier("tmp_" . uniqid())
+                    ;
+                    break;
+                }
+                
                 $result .= "DELETE";
                 if (isset($this->parts["deleteTables"])) {
                     $result .= " " . implode(", ", array_map([$this, "quoteIdentifier"], $this->parts["deleteTables"]));
+                } elseif (isset($this->parts["joins"]) && isset($this->parts["baseTableAlias"])) {
+                    $result .= " " . $this->quoteIdentifier($this->parts["baseTableAlias"]);
                 }
-                $result .= " FROM " . $this->quoteIdentifier($this->parts["baseTable"]);
+                $baseTableAlias = isset($this->parts["baseTableAlias"]) ? $this->parts["baseTableAlias"] : null;
+                $result .= " FROM " . $this->generateBaseTablePart($this->parts["baseTable"], isset($this->parts["joins"]) ? $baseTableAlias : null);
                 if (isset($this->parts["joins"])) {
                     $result .= " " . $this->generateJoinsPart($this->parts["joins"]);
                 }
@@ -120,7 +144,11 @@ class QueryBuilder extends AbstractQueryBuilder
                     // TODO: error
                 }
                 
-                $result .= "UPDATE " . $this->quoteIdentifier($this->parts["baseTable"]);
+                $baseTableAlias = isset($this->parts["baseTableAlias"]) ? $this->parts["baseTableAlias"] : null;
+                $result .= "UPDATE " . $this->generateBaseTablePart($this->parts["baseTable"], $baseTableAlias);
+                if (isset($this->parts["joins"])) {
+                    $result .= " " . $this->generateJoinsPart($this->parts["joins"]);
+                }
                 $result .= " SET " . $this->generateUpdateSetPart($this->parts["saveDatas"]);
                 if (isset($this->parts["where"])) {
                     $result .= " WHERE " . $this->generateWherePart($this->parts["where"]);
@@ -184,6 +212,9 @@ class QueryBuilder extends AbstractQueryBuilder
                             break;
                         case "expression":
                             // TODO
+                            break;
+                        case "raw":
+                            $selectItem = $value[1];
                             break;
                     }
                 } else {
@@ -260,6 +291,9 @@ class QueryBuilder extends AbstractQueryBuilder
                     break;
                 case "set":
                     $updateExpressions[] = $quotedField . "=" . "'" . implode(", ", array_map([$this, "escapeString"], $valueData)) . "'";
+                    break;
+                case "raw":
+                    $updateExpressions[] = $value[1];
                     break;
                     // TODO
             }
@@ -387,9 +421,15 @@ class QueryBuilder extends AbstractQueryBuilder
                         case 'expr':
                         case 'expression': // TODO
                             break;
+                        case 'raw':
+                            $wheres[] = $compareValue;
+                            break;
                         case 'not':
                             $not = $this->generateWherePart($compareValue);
                             $wheres[] = "NOT($not)";
+                            break;
+                        case 'ignore':
+                            // explicitly ignored!
                             break;
                     }
                 }
